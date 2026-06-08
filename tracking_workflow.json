@@ -1,0 +1,212 @@
+{
+  "name": "tracking_workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "maxResults": 50,
+        "filters": {
+          "q": "subject:\"Project Update\" OR subject:\"Task Progress\"",
+          "readStatus": "unread"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3f605d56-4d18-415a-87e4-def009b2e18c",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lFbjgCXnBb7oiD7i",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "fbdc5d73-7c94-49e2-8d26-8215db603de0",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the aggregated data array created by your Aggregate node\nconst aggregatedItems = $input.all()[0]?.json?.data || [];\nconst processedUpdates = [];\n\n// Loop through each email in the aggregated list\nfor (const email of aggregatedItems) {\n  \n  // Gmail triggers usually put the plain text preview in 'snippet' \n  // or a full body in 'text'. We'll check snippet first based on your screenshot.\n  const emailBody = email.snippet || email.text || \"\";\n  const rawSender = email.From || \"\"; // Note: Gmail node often uses capital 'From'\n\n  if (!rawSender) continue;\n\n  // Extract just the email inside the < > brackets (e.g., bonilokesh2003@gmail.com)\n  const emailRegex = /<([^>]+)>/;\n  const matchEmail = rawSender.match(emailRegex);\n  const senderEmail = matchEmail ? matchEmail[1].trim() : rawSender.trim();\n\n  // 1. Regex to extract tasks after \"Completed:\" up until \"Progress:\"\n  const completedMatch = emailBody.match(/Completed:\\s*(.*?)(?=Progress:|Status:|$)/i);\n  const completedTasks = completedMatch ? completedMatch[1].trim() : \"Not specified\";\n\n  // 2. Regex to extract progress percentage (e.g., 20%)\n  const progressMatch = emailBody.match(/Progress:\\s*(\\d+%|\\d+)/i);\n  const progressVal = progressMatch ? progressMatch[1] : \"0%\";\n\n  // 3. Regex to extract status (e.g., \"on track\")\n  const statusMatch = emailBody.match(/Status:\\s*(.*?)(?=$)/i);\n  const statusVal = statusMatch ? statusMatch[1].trim() : \"on track\";\n\n  // 4. Format the multi-line string for your Google Sheet\n  const latestDailyUpdate = `Completed: ${completedTasks}\\nProgress: ${progressVal}\\nStatus: ${statusVal}`;\n\n  processedUpdates.push({\n    Assigned_To_Email: senderEmail,\n    Status: statusVal.toLowerCase(),\n    Latest_Daily_Update: latestDailyUpdate\n  });\n}\n\n// Pass the array to the Split Out node\nreturn [ { json: { updates: processedUpdates } } ];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "0542af72-8abb-4ede-9d6f-01cdf50a2a47",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "updates",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "ac099484-6a1b-4c06-a978-4ae340886085",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "195QM42Ck0i8HNeXAfmINHp8rNSUMmbib8LocV0lvZxM",
+          "mode": "list",
+          "cachedResultName": "manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/195QM42Ck0i8HNeXAfmINHp8rNSUMmbib8LocV0lvZxM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 790029536,
+          "mode": "list",
+          "cachedResultName": "Tasks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/195QM42Ck0i8HNeXAfmINHp8rNSUMmbib8LocV0lvZxM/edit#gid=790029536"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Assigned_To_Email": "={{ $json.Assigned_To_Email }}",
+            "Status": "={{ $json.Status }}",
+            "Latest_Daily_Update": "={{ $json.Latest_Daily_Update }}"
+          },
+          "matchingColumns": [
+            "Assigned_To_Email"
+          ],
+          "schema": [
+            {
+              "id": "Assigned_To_Email",
+              "displayName": "Assigned_To_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Latest_Daily_Update",
+              "displayName": "Latest_Daily_Update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "bf6d9e32-0cf5-4408-b8e6-4774a60db16e",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bgKZ5sbrrnZSlz0w",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3c330f57-bbc1-464c-80e9-268fae112af5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e3bf2dd85d4679df8da49f1257ae9c4173f2e84c700bc6f8820219ff49805f8c"
+  },
+  "id": "O9uuL93yg55Dajgs",
+  "tags": []
+}

@@ -1,0 +1,237 @@
+{
+  "name": "Assignment_workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        -32
+      ],
+      "id": "dc17534a-5f88-4840-8d8f-97594d863856",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1IemQ1N1yyvDvTuZ9_i7c7aCs6_YdkTHE",
+          "mode": "list",
+          "cachedResultName": "Full-Stack Web Development Project Plan.pdf",
+          "cachedResultUrl": "https://drive.google.com/file/d/1IemQ1N1yyvDvTuZ9_i7c7aCs6_YdkTHE/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -624,
+        -32
+      ],
+      "id": "43ed9afa-2e7f-4b16-bf45-f81c0bd7a18f",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cajcXTl88LpqQ7y8",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        -32
+      ],
+      "id": "e3102378-b224-4321-a534-bc0581feb809",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the following document and extract all task assignments. For each task, identify:\n1. The task name/description\n2. The email address of the person it should be assigned to\n3. A clear description of what needs to be done\n\nDocument content:\n{{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a project manager assistant. Your job is to carefully read project documents and extract task assignments. Always identify the task name, the assignee email address, and provide a clear description of the work to be done."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -176,
+        -144
+      ],
+      "id": "8de8b7e1-ebaf-4383-a42a-48fbc2689155",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        80
+      ],
+      "id": "dbc81c38-5aa8-4c91-bf1b-27a715928af1",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jr0tpUViVldFgJ9v",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"tasks\": [\n    {\n      \"taskName\": \"Design mockups\",\n      \"assignedTo\": \"sarah@company.com\",\n      \"description\": \"Create UI/UX mockups for the website\"\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        80
+      ],
+      "id": "2242f3db-a6ad-417c-86d6-c61617059cd5",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.tasks",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -32
+      ],
+      "id": "3e6c84ef-779f-4d5c-ba50-91061cc2bdb0",
+      "name": "split tasks"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.assignedTo }}",
+        "subject": "={{ $json.taskName }}",
+        "message": "=<h2>You have been assigned a new task</h2>\n\n<p><strong>Task:</strong> {{ $json.taskName }}</p>\n\n<p><strong>Description:</strong></p>\n<p>{{ $json.description }}</p>\n\n<p><strong>Timeline:</strong></p>\n<ul>\n{{ $json.timeline.map(t => `<li>Day ${t.day}: ${t.module} (Due: ${t.deadline})</li>`).join(\"\\n\") }}\n</ul>\n\n<p>Please reply to this email daily with your progress update in the format:</p>\n<p><strong>Subject:</strong> Project Update - {{ $json.taskName }}</p>\n<p><strong>Body:</strong> Completed: [module name], Progress: [percentage], Status: [on track/delayed]</p>\n\n<p>Best regards,<br>Project Management System</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        -32
+      ],
+      "id": "0eb23882-63e0-47c2-a26b-a4c191d7513a",
+      "name": "Send a message",
+      "webhookId": "bd9bc456-f14a-4ed7-a9f9-d2296a31f30d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lFbjgCXnBb7oiD7i",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "split tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split tasks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e17b05b0-3a91-425b-893f-0fd3907281cf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e3bf2dd85d4679df8da49f1257ae9c4173f2e84c700bc6f8820219ff49805f8c"
+  },
+  "id": "IlhwpbmXfgQM4NCl",
+  "tags": []
+}
